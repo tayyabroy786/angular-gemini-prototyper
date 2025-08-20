@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "schematics": {
+    "prototyper": {
+      "description": "Generate a prototype component",
+      "factory": "./dist/src/prototyper/index#prototyper",
+      "schema": "./schema.json"
+    }
+  }
+}

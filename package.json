@@ -1,0 +1,31 @@
+{
+  "name": "prototyper",
+  "version": "0.0.0",
+  "description": "A blank schematics",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && jasmine src/**/*_spec.js"
+  },
+  "keywords": [
+    "schematics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "schematics": "./collection.json",
+  "dependencies": {
+    "@angular-devkit/core": "^20.1.6",
+    "@angular-devkit/schematics": "^20.1.6",
+    "@angular/common": "^20.1.7",
+    "@angular/compiler": "^20.1.7",
+    "@angular/core": "^20.1.7",
+    "@angular/platform-browser": "^20.1.7",
+    "@google/generative-ai": "^0.24.1",
+    "@schematics/angular": "^20.1.6",
+    "typescript": "~5.8.2"
+  },
+  "devDependencies": {
+    "@types/jasmine": "~5.1.0",
+    "@types/node": "^20.17.19",
+    "jasmine": "^5.0.0"
+  }
+}

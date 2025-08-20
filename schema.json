@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "prototyper",
+  "title": "Prototyper Options",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the component to generate.",
+      "x-prompt": "Enter the name of the component:"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "The prompt to send to the LLM to generate the component code.",
+      "x-prompt": "Enter the prompt for the component:"
+    },
+    "skipImport": {
+      "type": "boolean",
+      "description": "Skip adding the component to the nearest module.",
+      "default": false
+    },
+    "module": {
+      "type": "string",
+      "description": "The name or path of the module to add the component to."
+    },
+    "angularJsonPath": {
+      "type": "string",
+      "description": "The absolute path to the angular.json file.",
+      "default": ""
+    }
+  },
+  "required": [
+    "name",
+    "prompt"
+  ]
+}
