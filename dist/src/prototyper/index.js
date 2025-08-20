@@ -10,7 +10,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.prototyper = prototyper;
+const schematics_1 = require("@angular-devkit/schematics");
 const gemini_service_1 = require("./gemini.service");
+const find_module_1 = require("./find-module");
+const ast_utils_1 = require("@schematics/angular/utility/ast-utils");
+const ts = require("typescript");
+const change_1 = require("@schematics/angular/utility/change");
 // New function to parse the LLM's response
 function parseGeneratedCode(fullCodeString) {
     const code = {
@@ -19,8 +24,8 @@ function parseGeneratedCode(fullCodeString) {
         scss: ''
     };
     const tsMatch = fullCodeString.match(/### filename: .*?\.component\.ts ###\n```typescript\n([\s\S]*?)```/);
-    const htmlMatch = fullCodeString.match(/### filename: .*?\.component\.html ###\n```html\n([\s\S]*?)```/);
-    const scssMatch = fullCodeString.match(/### filename: .*?\.component\.scss ###\n```scss\n([\s\S]*?)```/);
+    const htmlMatch = fullCodeString.match(/### filename: .*?\.component.html ###\n```html\n([\s\S]*?)```/);
+    const scssMatch = fullCodeString.match(/### filename: .*?\.component.scss ###\n```scss\n([\s\S]*?)```/);
     if (tsMatch && tsMatch[1]) {
         code.ts = tsMatch[1].trim();
     }
@@ -68,7 +73,6 @@ User Request:
 function prototyper(_options) {
     return (tree, _context) => __awaiter(this, void 0, void 0, function* () {
         const componentName = _options.name;
-        const componentPath = `src/app/${componentName}`;
         const userPrompt = _options.prompt; // Read the prompt from the options
         const cssFramework = 'Tailwind CSS'; // We'll hardcode this for now.
         // --- Step 1: Create the full prompt and call the LLM
@@ -86,22 +90,59 @@ function prototyper(_options) {
             _context.logger.error(`Failed to generate code: ${error.message}`);
             return tree;
         }
-        // --- Step 2: Parse and write the files directly in the schematic's directory.
+        // --- Step 2: Parse and write the files
         const parsedCode = parseGeneratedCode(fullCodeString);
         if (!parsedCode.ts || !parsedCode.html) {
             _context.logger.error('Failed to parse component code from LLM output. Generated files may be incomplete.');
             return tree;
         }
-        // ✅ ensure src/app exists
-        if (!tree.exists('src/app/app.module.ts')) {
-            _context.logger.warn('⚠️ No src/app found — are you running this inside an Angular project?');
-        }
-        tree.create(`${componentPath}/${componentName}.component.ts`, parsedCode.ts);
-        tree.create(`${componentPath}/${componentName}.component.html`, parsedCode.html);
-        tree.create(`${componentPath}/${componentName}.component.scss`, parsedCode.scss);
+        // Now, we'll get the source root from angular.json.
+        const modulePath = yield (0, find_module_1.findModuleFromOptions)(tree, _options);
+        const sourceRoot = modulePath ? modulePath.substring(1, modulePath.indexOf('/app/app.module.ts')) : 'src';
+        const componentPath = `${sourceRoot}/app/${componentName}`;
+        // Overwrite existing files or create new ones
+        writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.ts`, parsedCode.ts);
+        writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.html`, parsedCode.html);
+        writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.scss`, parsedCode.scss);
         _context.logger.info(`✅ Component files for "${componentName}" created successfully!`);
-        _context.logger.info(`📝 The files were created in a new folder called "${componentName}" in your current directory. Please move them into your Angular project's 'src/app' folder and import the component manually.`);
+        // --- Step 3: Add the component to the nearest module based on standalone status
+        if (modulePath) {
+            const moduleSource = tree.read(modulePath).toString('utf-8');
+            const tsSourceFile = ts.createSourceFile(modulePath, moduleSource, ts.ScriptTarget.Latest, true);
+            const componentSource = tree.read(`${componentPath}/${componentName}.component.ts`).toString('utf-8');
+            const isStandalone = componentSource.includes('standalone: true');
+            const recorder = tree.beginUpdate(modulePath);
+            let changes = []; // Changed from InsertChange[]
+            const classifiedName = schematics_1.strings.classify(componentName);
+            if (isStandalone) {
+                // Add to imports array for standalone components
+                changes = (0, ast_utils_1.addImportToModule)(tsSourceFile, modulePath, `${componentName}Component`, `./${componentName}/${componentName}.component`);
+                _context.logger.info(`✅ Component "${componentName}Component" added to imports of "${modulePath}" (standalone).`);
+            }
+            else {
+                // Add to declarations array for non-standalone components
+                changes = (0, ast_utils_1.addDeclarationToModule)(tsSourceFile, modulePath, `${classifiedName}Component`, `./${componentName}/${componentName}.component`);
+                _context.logger.info(`✅ Component "${componentName}Component" added to declarations of "${modulePath}" (non-standalone).`);
+            }
+            for (const change of changes) {
+                if (change instanceof change_1.InsertChange) {
+                    recorder.insertLeft(change.pos, change.toAdd);
+                }
+            }
+            tree.commitUpdate(recorder);
+        }
+        else {
+            _context.logger.warn(`⚠️ Could not find a module to add the component to. Your project is likely standalone. Please import the component into your app.component.ts file manually.`);
+        }
         return tree;
     });
+    function writeOrOverwriteFile(tree, filePath, content) {
+        if (tree.exists(filePath)) {
+            tree.overwrite(filePath, content);
+        }
+        else {
+            tree.create(filePath, content);
+        }
+    }
 }
 //# sourceMappingURL=index.js.map

@@ -1,5 +1,9 @@
-import { Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
+import { Rule, SchematicContext, strings, Tree } from '@angular-devkit/schematics';
 import { generateComponentCode } from './gemini.service';
+import { findModuleFromOptions } from './find-module';
+import { addDeclarationToModule, addImportToModule } from '@schematics/angular/utility/ast-utils';
+import * as ts from 'typescript';
+import { Change, InsertChange } from '@schematics/angular/utility/change';
 
 // New function to parse the LLM's response
 function parseGeneratedCode(fullCodeString: string): { ts: string, html: string, scss: string } {
@@ -10,8 +14,8 @@ function parseGeneratedCode(fullCodeString: string): { ts: string, html: string,
   };
 
   const tsMatch = fullCodeString.match(/### filename: .*?\.component\.ts ###\n```typescript\n([\s\S]*?)```/);
-  const htmlMatch = fullCodeString.match(/### filename: .*?\.component\.html ###\n```html\n([\s\S]*?)```/);
-  const scssMatch = fullCodeString.match(/### filename: .*?\.component\.scss ###\n```scss\n([\s\S]*?)```/);
+  const htmlMatch = fullCodeString.match(/### filename: .*?\.component.html ###\n```html\n([\s\S]*?)```/);
+  const scssMatch = fullCodeString.match(/### filename: .*?\.component.scss ###\n```scss\n([\s\S]*?)```/);
 
   if (tsMatch && tsMatch[1]) {
     code.ts = tsMatch[1].trim();
@@ -64,7 +68,6 @@ export function prototyper(_options: any): Rule {
   return async (tree: Tree, _context: SchematicContext) => {
 
     const componentName = _options.name;
-    const componentPath = `src/app/${componentName}`;
     const userPrompt = _options.prompt; // Read the prompt from the options
     const cssFramework = 'Tailwind CSS'; // We'll hardcode this for now.
 
@@ -85,7 +88,7 @@ export function prototyper(_options: any): Rule {
       return tree;
     }
 
-    // --- Step 2: Parse and write the files directly in the schematic's directory.
+    // --- Step 2: Parse and write the files
     const parsedCode = parseGeneratedCode(fullCodeString);
 
     if (!parsedCode.ts || !parsedCode.html) {
@@ -93,20 +96,63 @@ export function prototyper(_options: any): Rule {
       return tree;
     }
 
+    // Now, we'll get the source root from angular.json.
+    const modulePath = await findModuleFromOptions(tree, _options);
+    const sourceRoot = modulePath ? modulePath.substring(1, modulePath.indexOf('/app/app.module.ts')) : 'src';
+    const componentPath = `${sourceRoot}/app/${componentName}`;
 
-    // ✅ ensure src/app exists
-    if (!tree.exists('src/app/app.module.ts')) {
-      _context.logger.warn('⚠️ No src/app found — are you running this inside an Angular project?');
-    }
-
-
-    tree.create(`${componentPath}/${componentName}.component.ts`, parsedCode.ts);
-    tree.create(`${componentPath}/${componentName}.component.html`, parsedCode.html);
-    tree.create(`${componentPath}/${componentName}.component.scss`, parsedCode.scss);
+    // Overwrite existing files or create new ones
+    writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.ts`, parsedCode.ts);
+    writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.html`, parsedCode.html);
+    writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.scss`, parsedCode.scss);
 
     _context.logger.info(`✅ Component files for "${componentName}" created successfully!`);
-    _context.logger.info(`📝 The files were created in a new folder called "${componentName}" in your current directory. Please move them into your Angular project's 'src/app' folder and import the component manually.`);
+
+    // --- Step 3: Add the component to the nearest module based on standalone status
+    if (modulePath) {
+      const moduleSource = tree.read(modulePath)!.toString('utf-8');
+      const tsSourceFile = ts.createSourceFile(modulePath, moduleSource, ts.ScriptTarget.Latest, true);
+      const componentSource = tree.read(`${componentPath}/${componentName}.component.ts`)!.toString('utf-8');
+      const isStandalone = componentSource.includes('standalone: true');
+
+      const recorder = tree.beginUpdate(modulePath);
+      let changes: Change[] = []; // Changed from InsertChange[]
+      const classifiedName = strings.classify(componentName);
+      
+      if (isStandalone) {
+        // Add to imports array for standalone components
+        changes = addImportToModule(tsSourceFile, modulePath, `${componentName}Component`, `./${componentName}/${componentName}.component`);
+        _context.logger.info(`✅ Component "${componentName}Component" added to imports of "${modulePath}" (standalone).`);
+      } else {
+        // Add to declarations array for non-standalone components
+        changes = addDeclarationToModule(
+          tsSourceFile,
+          modulePath,
+          `${classifiedName}Component`,
+          `./${componentName}/${componentName}.component`
+        ); _context.logger.info(`✅ Component "${componentName}Component" added to declarations of "${modulePath}" (non-standalone).`);
+      }
+
+      for (const change of changes) {
+        if (change instanceof InsertChange) {
+          recorder.insertLeft(change.pos, change.toAdd);
+        }
+      }
+      tree.commitUpdate(recorder);
+    } else {
+      _context.logger.warn(`⚠️ Could not find a module to add the component to. Your project is likely standalone. Please import the component into your app.component.ts file manually.`);
+    }
 
     return tree;
   };
+
+
+
+  function writeOrOverwriteFile(tree: Tree, filePath: string, content: string) {
+    if (tree.exists(filePath)) {
+      tree.overwrite(filePath, content);
+    } else {
+      tree.create(filePath, content);
+    }
+  }
 }

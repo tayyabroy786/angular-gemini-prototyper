@@ -38,14 +38,15 @@ var __setFunctionName = (this && this.__setFunctionName) || function (f, name, p
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ProductCardComponent = void 0;
+exports.PCardComponent = void 0;
 const core_1 = require("@angular/core");
-let ProductCardComponent = (() => {
+let PCardComponent = (() => {
     let _classDecorators = [(0, core_1.Component)({
-            selector: 'app-product-card',
-            templateUrl: './product-card.component.html',
+            selector: 'app-p-card',
             standalone: true,
-            styleUrls: ['./product-card.component.scss']
+            imports: [],
+            templateUrl: './p-card.component.html',
+            styleUrls: ['./p-card.component.scss']
         })];
     let _classDescriptor;
     let _classExtraInitializers = [];
@@ -53,7 +54,7 @@ let ProductCardComponent = (() => {
     let _product_decorators;
     let _product_initializers = [];
     let _product_extraInitializers = [];
-    var ProductCardComponent = _classThis = class {
+    var PCardComponent = _classThis = class {
         constructor() {
             this.product = __runInitializers(this, _product_initializers, {
                 image: 'https://via.placeholder.com/150',
@@ -63,17 +64,17 @@ let ProductCardComponent = (() => {
             __runInitializers(this, _product_extraInitializers);
         }
     };
-    __setFunctionName(_classThis, "ProductCardComponent");
+    __setFunctionName(_classThis, "PCardComponent");
     (() => {
         const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : void 0;
         _product_decorators = [(0, core_1.Input)()];
         __esDecorate(null, null, _product_decorators, { kind: "field", name: "product", static: false, private: false, access: { has: obj => "product" in obj, get: obj => obj.product, set: (obj, value) => { obj.product = value; } }, metadata: _metadata }, _product_initializers, _product_extraInitializers);
         __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ProductCardComponent = _classThis = _classDescriptor.value;
+        PCardComponent = _classThis = _classDescriptor.value;
         if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         __runInitializers(_classThis, _classExtraInitializers);
     })();
-    return ProductCardComponent = _classThis;
+    return PCardComponent = _classThis;
 })();
-exports.ProductCardComponent = ProductCardComponent;
-//# sourceMappingURL=product-card.component.js.map
+exports.PCardComponent = PCardComponent;
+//# sourceMappingURL=p-card.component.js.map

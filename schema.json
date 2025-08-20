@@ -22,11 +22,6 @@
     "module": {
       "type": "string",
       "description": "The name or path of the module to add the component to."
-    },
-    "angularJsonPath": {
-      "type": "string",
-      "description": "The absolute path to the angular.json file.",
-      "default": ""
     }
   },
   "required": [

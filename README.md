@@ -81,3 +81,9 @@ npm install -g @angular/cli
 - [Angular Official Docs](https://angular.io/docs)
 - [Tailwind CSS Docs](https://tailwindcss.com/docs)
 - [Gemini AI](https://www.gemini.ai)
+
+
+
+
+
+<!-- npx schematics .:prototyper --dry-run=false -->
