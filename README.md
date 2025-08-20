@@ -87,3 +87,4 @@ npm install -g @angular/cli
 
 
 <!-- npx schematics .:prototyper --dry-run=false -->
+<!-- npx schematics prototyper:prototyper --project="demo-app" -->

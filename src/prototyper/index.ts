@@ -16,6 +16,8 @@ function parseGeneratedCode(fullCodeString: string): { ts: string, html: string,
   const tsMatch = fullCodeString.match(/### filename: .*?\.component\.ts ###\n```typescript\n([\s\S]*?)```/);
   const htmlMatch = fullCodeString.match(/### filename: .*?\.component.html ###\n```html\n([\s\S]*?)```/);
   const scssMatch = fullCodeString.match(/### filename: .*?\.component.scss ###\n```scss\n([\s\S]*?)```/);
+  const cssMatch = fullCodeString.match(/### filename: .*?\.component.css ###\n```css\n([\s\S]*?)```/);
+
 
   if (tsMatch && tsMatch[1]) {
     code.ts = tsMatch[1].trim();
@@ -26,6 +28,10 @@ function parseGeneratedCode(fullCodeString: string): { ts: string, html: string,
   if (scssMatch && scssMatch[1]) {
     code.scss = scssMatch[1].trim();
   }
+  if (cssMatch && cssMatch[1]) {
+    code.scss = cssMatch[1].trim(); // Store CSS content in the same property for simplicity
+  }
+
 
   return code;
 }
@@ -46,17 +52,17 @@ Your response MUST follow this exact, structured format:
 <!-- Angular HTML code -->
 \`\`\`
 
-### filename: [[COMPONENT_NAME]].component.scss ###
-\`\`\`scss
-/* Angular SCSS code */
+### filename: [[COMPONENT_NAME]].component.[[STYLE_EXTENSION]] ###
+\`\`\`[[STYLE_LANGUAGE]]
+/* Angular [[STYLE_LANGUAGE]] code */
 \`\`\`
 
 Instructions:
 1. Generate a standalone Angular component.
 2. The component's name is "[[COMPONENT_NAME]]".
-3. The HTML should use the [[CSS_FRAMEWORK]] framework.
+3. The HTML should use the Tailwind CSS framework.
 4. The TypeScript file should include a component class with relevant @Input() properties and a mock data object for demonstration.
-5. The SCSS should only contain styling that cannot be handled by the CSS framework. If no custom styling is needed, leave the SCSS code block empty.
+5. The [[STYLE_LANGUAGE]] file should only contain styling that cannot be handled by the Tailwind CSS framework. If no custom styling is needed, leave the SCSS code block empty.
 6. The TypeScript file must include "import { Component } from '@angular/core';" at the top.
 7. Do not include any additional comments or explanations in the code blocks.
 8. Ensure the code is valid and can be directly used in an Angular project.
@@ -68,13 +74,15 @@ export function prototyper(_options: any): Rule {
   return async (tree: Tree, _context: SchematicContext) => {
 
     const componentName = _options.name;
-    const userPrompt = _options.prompt; // Read the prompt from the options
-    const cssFramework = 'Tailwind CSS'; // We'll hardcode this for now.
+    const userPrompt = _options.prompt;
+    const style = _options.style || 'scss'; // Read the style from options, default to scss
+    const styleLanguage = style.toUpperCase();
 
     // --- Step 1: Create the full prompt and call the LLM
     const fullPrompt = promptTemplate
       .replace('[[COMPONENT_NAME]]', componentName)
-      .replace('[[CSS_FRAMEWORK]]', cssFramework)
+      .replace('[[STYLE_EXTENSION]]', style)
+      .replace('[[STYLE_LANGUAGE]]', styleLanguage)
       .replace('[[USER_REQUEST]]', userPrompt);
 
     let fullCodeString: string;
@@ -104,7 +112,7 @@ export function prototyper(_options: any): Rule {
     // Overwrite existing files or create new ones
     writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.ts`, parsedCode.ts);
     writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.html`, parsedCode.html);
-    writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.scss`, parsedCode.scss);
+    writeOrOverwriteFile(tree, `${componentPath}/${componentName}.component.${style}`, parsedCode.scss);
 
     _context.logger.info(`✅ Component files for "${componentName}" created successfully!`);
 
@@ -118,11 +126,11 @@ export function prototyper(_options: any): Rule {
       const recorder = tree.beginUpdate(modulePath);
       let changes: Change[] = []; // Changed from InsertChange[]
       const classifiedName = strings.classify(componentName);
-      
+
       if (isStandalone) {
         // Add to imports array for standalone components
-        changes = addImportToModule(tsSourceFile, modulePath, `${componentName}Component`, `./${componentName}/${componentName}.component`);
-        _context.logger.info(`✅ Component "${componentName}Component" added to imports of "${modulePath}" (standalone).`);
+        changes = addImportToModule(tsSourceFile, modulePath, `${classifiedName}Component`, `./${componentName}/${componentName}.component`);
+        _context.logger.info(`✅ Component "${classifiedName}Component" added to imports of "${modulePath}" (standalone).`);
       } else {
         // Add to declarations array for non-standalone components
         changes = addDeclarationToModule(
@@ -130,7 +138,8 @@ export function prototyper(_options: any): Rule {
           modulePath,
           `${classifiedName}Component`,
           `./${componentName}/${componentName}.component`
-        ); _context.logger.info(`✅ Component "${componentName}Component" added to declarations of "${modulePath}" (non-standalone).`);
+        );
+        _context.logger.info(`✅ Component "${classifiedName}Component" added to declarations of "${modulePath}" (non-standalone).`);
       }
 
       for (const change of changes) {
@@ -145,8 +154,6 @@ export function prototyper(_options: any): Rule {
 
     return tree;
   };
-
-
 
   function writeOrOverwriteFile(tree: Tree, filePath: string, content: string) {
     if (tree.exists(filePath)) {
